@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
+	"github.com/xitongsys/parquet-go-source/local"
+	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/writer"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -28,13 +31,13 @@ type GTFSClient struct {
 
 // VehicleUpdate represents processed GTFS data
 type VehicleUpdate struct {
-	TripID    string
-	RouteID   string
-	Status    string
-	Timestamp time.Time
+	Timestamp int64 `parquet:"name=timestamp, type=INT64, convertedType=TIMESTAMP_MILLIS"`
 	Position  *gtfs.Position
-	StopID    string
-	Delay     int32
+	TripID    string `parquet:"name=trip_id,type=BYTE_ARRAY,convertedtype=UTF8"`
+	RouteID   string `parquet:"name=route_id,type=BYTE_ARRAY,convertedtype=UTF8"`
+	Status    string `parquet:"name=status,type=BYTE_ARRAY,convertedtype=UTF8"`
+	StopID    string `parquet:"name=stop_id,type=BYTE_ARRAY,convertedtype=UTF8"`
+	Delay     int32  `parquet:"name=delay,type=INT32"`
 }
 
 // NewGTFSClient creates a new GTFS client
@@ -137,7 +140,7 @@ func (g *GTFSClient) processTripUpdate(update *gtfs.TripUpdate, timestamp time.T
 		updates = append(updates, VehicleUpdate{
 			TripID:    tripID,
 			RouteID:   routeID,
-			Timestamp: timestamp,
+			Timestamp: timestamp.UnixMilli(),
 			Delay:     delay,
 			StopID:    getString(stopTimeUpdate.StopId),
 		})
@@ -153,7 +156,7 @@ func (g *GTFSClient) processVehicleUpdate(vehicle *gtfs.VehiclePosition, timesta
 	}
 
 	update := &VehicleUpdate{
-		Timestamp: timestamp,
+		Timestamp: timestamp.UnixMilli(),
 		Position:  vehicle.Position,
 		StopID:    getString(vehicle.StopId),
 	}
@@ -225,6 +228,38 @@ func getInt32(i *int32) int32 {
 	return *i
 }
 
+func writeVehicleUpdates(filename string, updates []VehicleUpdate) {
+	var err error
+	fw, err := local.NewLocalFileWriter(filename)
+	if err != nil {
+		log.Println("Can't create local file", err)
+		return
+	}
+
+	pw, err := writer.NewParquetWriter(fw, new(VehicleUpdate), 4)
+	if err != nil {
+		log.Println("Can't create parquet writer", err)
+		return
+	}
+
+	// pw.RowGroupSize = 128 * 1024 * 1024 //128M
+	// pw.PageSize = 8 * 1024              //8K
+	pw.CompressionType = parquet.CompressionCodec_ZSTD
+
+	for _, vu := range updates {
+		if err = pw.Write(vu); err != nil {
+			log.Println("Write error", err)
+		}
+	}
+
+	if err = pw.WriteStop(); err != nil {
+		log.Println("WriteStop error", err)
+		return
+	}
+	log.Println("Write Finished")
+	fw.Close()
+}
+
 func main() {
 	config := Config{
 		FeedURL: "https://zet.hr/gtfs-rt-protobuf",
@@ -241,9 +276,5 @@ func main() {
 
 	fmt.Printf("Fetched %d updates in %v\n", metrics.UpdatesCount, metrics.TotalTime)
 
-	for _, update := range updates {
-		if update.RouteID == "12" && update.TripID == "0_3_1205_12_31391" {
-			fmt.Printf("%#v\n", update)
-		}
-	}
+	writeVehicleUpdates("output/vehicle_updates.parquet", updates)
 }
