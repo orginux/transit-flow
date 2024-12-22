@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
@@ -228,9 +229,15 @@ func getInt32(i *int32) int32 {
 	return *i
 }
 
-func writeVehicleUpdates(filename string, updates []VehicleUpdate) {
+func writeVehicleUpdates(basePath string, updates []VehicleUpdate) {
+
+	// Generate filename
+	filename := fmt.Sprintf("gtfs_%s.parquet",
+		time.Now().Format("2006-01-02_15-04-05"))
+	fullPath := filepath.Join(basePath, filename)
+
 	var err error
-	fw, err := local.NewLocalFileWriter(filename)
+	fw, err := local.NewLocalFileWriter(fullPath)
 	if err != nil {
 		log.Println("Can't create local file", err)
 		return
@@ -276,5 +283,5 @@ func main() {
 
 	fmt.Printf("Fetched %d updates in %v\n", metrics.UpdatesCount, metrics.TotalTime)
 
-	writeVehicleUpdates("output/vehicle_updates.parquet", updates)
+	writeVehicleUpdates("output/", updates)
 }
