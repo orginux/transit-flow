@@ -229,7 +229,7 @@ func getInt32(i *int32) int32 {
 	return *i
 }
 
-func writeVehicleUpdates(basePath string, updates []VehicleUpdate) {
+func writeVehicleUpdates(basePath string, updates []VehicleUpdate) error {
 
 	// Generate filename
 	filename := fmt.Sprintf("gtfs_%s.parquet",
@@ -239,14 +239,13 @@ func writeVehicleUpdates(basePath string, updates []VehicleUpdate) {
 	var err error
 	fw, err := local.NewLocalFileWriter(fullPath)
 	if err != nil {
-		log.Println("Can't create local file", err)
-		return
+		return fmt.Errorf("create local file writer: %w", err)
 	}
+	defer fw.Close()
 
 	pw, err := writer.NewParquetWriter(fw, new(VehicleUpdate), 4)
 	if err != nil {
-		log.Println("Can't create parquet writer", err)
-		return
+		return fmt.Errorf("create parquet writer: %w", err)
 	}
 
 	// pw.RowGroupSize = 128 * 1024 * 1024 //128M
@@ -260,11 +259,10 @@ func writeVehicleUpdates(basePath string, updates []VehicleUpdate) {
 	}
 
 	if err = pw.WriteStop(); err != nil {
-		log.Println("WriteStop error", err)
-		return
+		return fmt.Errorf("write stop: %w", err)
 	}
-	log.Println("Write Finished")
 	fw.Close()
+	return nil
 }
 
 func main() {
@@ -283,5 +281,7 @@ func main() {
 
 	fmt.Printf("Fetched %d updates in %v\n", metrics.UpdatesCount, metrics.TotalTime)
 
-	writeVehicleUpdates("output/", updates)
+	if err = writeVehicleUpdates("output/", updates); err != nil {
+		log.Fatalf("Failed to write updates: %v", err)
+	}
 }
