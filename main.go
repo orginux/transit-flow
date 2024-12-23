@@ -6,13 +6,11 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"path/filepath"
 	"time"
+	"transit-flow/internal/storage"
+	"transit-flow/internal/types"
 
 	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
-	"github.com/xitongsys/parquet-go-source/local"
-	"github.com/xitongsys/parquet-go/parquet"
-	"github.com/xitongsys/parquet-go/writer"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -28,17 +26,6 @@ type Config struct {
 type GTFSClient struct {
 	config Config
 	client *http.Client
-}
-
-// VehicleUpdate represents processed GTFS data
-type VehicleUpdate struct {
-	Timestamp int64 `parquet:"name=timestamp, type=INT64, convertedType=TIMESTAMP_MILLIS"`
-	Position  *gtfs.Position
-	TripID    string `parquet:"name=trip_id,type=BYTE_ARRAY,convertedtype=UTF8"`
-	RouteID   string `parquet:"name=route_id,type=BYTE_ARRAY,convertedtype=UTF8"`
-	Status    string `parquet:"name=status,type=BYTE_ARRAY,convertedtype=UTF8"`
-	StopID    string `parquet:"name=stop_id,type=BYTE_ARRAY,convertedtype=UTF8"`
-	Delay     int32  `parquet:"name=delay,type=INT32"`
 }
 
 // NewGTFSClient creates a new GTFS client
@@ -60,7 +47,7 @@ type Metrics struct {
 }
 
 // FetchUpdates fetches and processes GTFS realtime data
-func (g *GTFSClient) FetchUpdates(ctx context.Context) ([]VehicleUpdate, Metrics, error) {
+func (g *GTFSClient) FetchUpdates(ctx context.Context) ([]types.VehicleUpdate, Metrics, error) {
 	metrics := Metrics{}
 
 	totalStart := time.Now()
@@ -120,8 +107,8 @@ func (g *GTFSClient) fetchFeed(ctx context.Context) (*gtfs.FeedMessage, error) {
 }
 
 // processTripUpdate handles trip updates
-func (g *GTFSClient) processTripUpdate(update *gtfs.TripUpdate, timestamp time.Time) []VehicleUpdate {
-	updates := make([]VehicleUpdate, 0, len(update.StopTimeUpdate))
+func (g *GTFSClient) processTripUpdate(update *gtfs.TripUpdate, timestamp time.Time) []types.VehicleUpdate {
+	updates := make([]types.VehicleUpdate, 0, len(update.StopTimeUpdate))
 
 	// Check if Trip is nil
 	if update.Trip == nil {
@@ -138,7 +125,7 @@ func (g *GTFSClient) processTripUpdate(update *gtfs.TripUpdate, timestamp time.T
 			delay = getInt32(stopTimeUpdate.Arrival.Delay)
 		}
 
-		updates = append(updates, VehicleUpdate{
+		updates = append(updates, types.VehicleUpdate{
 			TripID:    tripID,
 			RouteID:   routeID,
 			Timestamp: timestamp.UnixMilli(),
@@ -151,12 +138,12 @@ func (g *GTFSClient) processTripUpdate(update *gtfs.TripUpdate, timestamp time.T
 }
 
 // processVehicleUpdate handles vehicle updates
-func (g *GTFSClient) processVehicleUpdate(vehicle *gtfs.VehiclePosition, timestamp time.Time) *VehicleUpdate {
+func (g *GTFSClient) processVehicleUpdate(vehicle *gtfs.VehiclePosition, timestamp time.Time) *types.VehicleUpdate {
 	if vehicle == nil {
 		return nil
 	}
 
-	update := &VehicleUpdate{
+	update := &types.VehicleUpdate{
 		Timestamp: timestamp.UnixMilli(),
 		Position:  vehicle.Position,
 		StopID:    getString(vehicle.StopId),
@@ -175,8 +162,8 @@ func (g *GTFSClient) processVehicleUpdate(vehicle *gtfs.VehiclePosition, timesta
 }
 
 // processEntity handles individual GTFS entities
-func (g *GTFSClient) processEntity(entity *gtfs.FeedEntity, timestamp time.Time) []VehicleUpdate {
-	var updates []VehicleUpdate
+func (g *GTFSClient) processEntity(entity *gtfs.FeedEntity, timestamp time.Time) []types.VehicleUpdate {
+	var updates []types.VehicleUpdate
 
 	// Check if entity is nil
 	if entity == nil {
@@ -197,8 +184,8 @@ func (g *GTFSClient) processEntity(entity *gtfs.FeedEntity, timestamp time.Time)
 }
 
 // processFeed processes GTFS feed data into vehicle updates
-func (g *GTFSClient) processFeed(feed *gtfs.FeedMessage) []VehicleUpdate {
-	updates := make([]VehicleUpdate, 0)
+func (g *GTFSClient) processFeed(feed *gtfs.FeedMessage) []types.VehicleUpdate {
+	updates := make([]types.VehicleUpdate, 0)
 
 	// Check if feed or Entity is nil
 	if feed == nil || feed.Entity == nil {
@@ -229,42 +216,6 @@ func getInt32(i *int32) int32 {
 	return *i
 }
 
-func writeVehicleUpdates(basePath string, updates []VehicleUpdate) error {
-
-	// Generate filename
-	filename := fmt.Sprintf("gtfs_%s.parquet",
-		time.Now().Format("2006-01-02_15-04-05"))
-	fullPath := filepath.Join(basePath, filename)
-
-	var err error
-	fw, err := local.NewLocalFileWriter(fullPath)
-	if err != nil {
-		return fmt.Errorf("create local file writer: %w", err)
-	}
-	defer fw.Close()
-
-	pw, err := writer.NewParquetWriter(fw, new(VehicleUpdate), 4)
-	if err != nil {
-		return fmt.Errorf("create parquet writer: %w", err)
-	}
-
-	// pw.RowGroupSize = 128 * 1024 * 1024 //128M
-	// pw.PageSize = 8 * 1024              //8K
-	pw.CompressionType = parquet.CompressionCodec_ZSTD
-
-	for _, vu := range updates {
-		if err = pw.Write(vu); err != nil {
-			log.Println("Write error", err)
-		}
-	}
-
-	if err = pw.WriteStop(); err != nil {
-		return fmt.Errorf("write stop: %w", err)
-	}
-	fw.Close()
-	return nil
-}
-
 func main() {
 	config := Config{
 		FeedURL: "https://zet.hr/gtfs-rt-protobuf",
@@ -281,7 +232,17 @@ func main() {
 
 	fmt.Printf("Fetched %d updates in %v\n", metrics.UpdatesCount, metrics.TotalTime)
 
-	if err = writeVehicleUpdates("output/", updates); err != nil {
+	localConfig := storage.Config{
+		BasePath:   "output/",
+		TimeFormat: "2006-01-02_15-04-05",
+		FilePrefix: "gtfs",
+	}
+	localStorage := storage.NewLocalStorage(localConfig)
+
+	storageProvider := localStorage
+	path, err := storageProvider.Write(ctx, updates)
+	if err != nil {
 		log.Fatalf("Failed to write updates: %v", err)
 	}
+	fmt.Printf("Wrote updates to %s\n", path)
 }
