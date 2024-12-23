@@ -22,6 +22,6 @@ type Config struct {
 
 func filenameGenerator(config Config) string {
 	filename := fmt.Sprintf("gtfs_%s.parquet",
-		time.Now().Format("2006-01-02_15-04-05"))
+		time.Now().Format(config.TimeFormat))
 	return filename
 }
