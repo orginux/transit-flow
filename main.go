@@ -12,6 +12,10 @@ import (
 	"transit-flow/internal/types"
 )
 
+const (
+	feedURL = "https://zet.hr/gtfs-rt-protobuf"
+)
+
 // Storage defines interface for both local and GCS storage
 type Storage interface {
 	Write(ctx context.Context, updates []types.VehicleUpdate) (string, error)
@@ -46,7 +50,7 @@ func main() {
 
 	// Fetch GTFS updates
 	config := gtfs.Config{
-		FeedURL: "https://zet.hr/gtfs-rt-protobuf",
+		FeedURL: feedURL,
 		Timeout: 10 * time.Second,
 	}
 	client := gtfs.NewClient(config)
