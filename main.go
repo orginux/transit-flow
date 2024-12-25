@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 	"transit-flow/internal/gtfs"
@@ -31,6 +32,18 @@ func isLocalOnly() bool {
 }
 
 func main() {
+	// Start minimal HTTP server for health check
+	go func() {
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, "OK")
+		})
+		http.ListenAndServe(":"+port, nil)
+	}()
+
 	// Fetch GTFS updates
 	config := gtfs.Config{
 		FeedURL: "https://zet.hr/gtfs-rt-protobuf",
