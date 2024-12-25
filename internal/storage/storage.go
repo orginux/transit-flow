@@ -18,6 +18,8 @@ type Config struct {
 	BasePath   string
 	TimeFormat string
 	FilePrefix string
+	BucketName string // GCS bucket name
+	ProjectID  string // GCS project ID
 }
 
 func filenameGenerator(config Config) string {
