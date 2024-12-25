@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"path"
 	"transit-flow/internal/types"
 
 	"github.com/xitongsys/parquet-go-source/gcs"
@@ -23,13 +24,14 @@ func NewGCSStorage(config Config) *GCSStorage {
 func (gs *GCSStorage) Write(ctx context.Context, updates []types.VehicleUpdate) (string, error) {
 	filename := filenameGenerator(gs.config)
 	fullPath := fmt.Sprintf("gs://%s/%s/%s", gs.config.BucketName, gs.config.BasePath, filename)
+	objectPath := path.Join(gs.config.BasePath, filename)
 
 	// Create a new GCS file writer
 	fw, err := gcs.NewGcsFileWriter(
 		ctx,
 		gs.config.ProjectID,
 		gs.config.BucketName,
-		gs.config.BasePath+filename,
+		objectPath,
 	)
 	if err != nil {
 		return "", fmt.Errorf("create GCS file writer: %w", err)
