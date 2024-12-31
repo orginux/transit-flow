@@ -5,7 +5,7 @@ import "time"
 // Config holds all configuration parameters
 type Config struct {
 	FeedURL  string
-	Username string
+	Username string // Not used for this datasource
 	Password string
 	Timeout  time.Duration
 }

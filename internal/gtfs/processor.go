@@ -57,6 +57,13 @@ func (g *Client) processVehicleUpdate(vehicle *gtfs.VehiclePosition, timestamp t
 		update.Status = vehicle.CurrentStatus.String()
 	}
 
+	if vehicle.CurrentStopSequence != nil {
+		seq := vehicle.GetCurrentStopSequence()
+		update.StopSequence = int32(seq)
+	}
+
+	if vehicle.Position
+
 	return update
 }
 
