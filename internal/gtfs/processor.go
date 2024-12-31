@@ -44,7 +44,6 @@ func (g *Client) processVehicleUpdate(vehicle *gtfs.VehiclePosition, timestamp t
 
 	update := &types.VehicleUpdate{
 		Timestamp: timestamp.UnixMilli(),
-		Position:  vehicle.Position,
 		StopID:    getString(vehicle.StopId),
 	}
 
@@ -62,7 +61,13 @@ func (g *Client) processVehicleUpdate(vehicle *gtfs.VehiclePosition, timestamp t
 		update.StopSequence = int32(seq)
 	}
 
-	if vehicle.Position
+	if vehicle.Vehicle.Id != nil {
+		update.VehicleID = getString(vehicle.GetVehicle().Id)
+	}
+
+	update.Latitude = vehicle.Position.GetLatitude()
+	update.Longitude = vehicle.Position.GetLongitude()
+	update.Bearing = vehicle.Position.GetBearing()
 
 	return update
 }
