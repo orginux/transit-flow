@@ -13,4 +13,5 @@ type VehicleUpdate struct {
 	StopID       string  `parquet:"name=stop_id,type=BYTE_ARRAY,convertedtype=UTF8"`
 	StopSequence int32   `parquet:"name=stop_sequence,type=INT32,convertedtype=UINT_32"`
 	Delay        int32   `parquet:"name=delay,type=INT32"`
+	DirectionID  int32   `parquet:"name=direction_id,type=INT32,convertedtype=UINT_32"`
 }

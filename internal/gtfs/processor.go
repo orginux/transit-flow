@@ -25,11 +25,12 @@ func (g *Client) processTripUpdate(update *gtfs.TripUpdate, timestamp time.Time)
 		}
 
 		updates = append(updates, types.VehicleUpdate{
-			TripID:    tripID,
-			RouteID:   routeID,
-			Timestamp: timestamp.UnixMilli(),
-			Delay:     delay,
-			StopID:    getString(stopTimeUpdate.StopId),
+			TripID:      tripID,
+			RouteID:     routeID,
+			Timestamp:   timestamp.UnixMilli(),
+			Delay:       delay,
+			StopID:      getString(stopTimeUpdate.StopId),
+			DirectionID: int32(update.GetTrip().GetDirectionId()),
 		})
 	}
 
