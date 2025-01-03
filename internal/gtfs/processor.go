@@ -17,6 +17,7 @@ func (g *Client) processTripUpdate(update *gtfs.TripUpdate, timestamp time.Time)
 
 	tripID := getString(update.Trip.TripId)
 	routeID := getString(update.Trip.RouteId)
+	direction := int32(update.GetTrip().GetDirectionId())
 
 	for _, stopTimeUpdate := range update.StopTimeUpdate {
 		var delay int32
@@ -30,7 +31,7 @@ func (g *Client) processTripUpdate(update *gtfs.TripUpdate, timestamp time.Time)
 			Timestamp:   timestamp.UnixMilli(),
 			Delay:       delay,
 			StopID:      getString(stopTimeUpdate.StopId),
-			DirectionID: int32(update.GetTrip().GetDirectionId()),
+			DirectionID: direction,
 		})
 	}
 
@@ -39,18 +40,23 @@ func (g *Client) processTripUpdate(update *gtfs.TripUpdate, timestamp time.Time)
 
 // processVehicleUpdate handles vehicle updates
 func (g *Client) processVehicleUpdate(vehicle *gtfs.VehiclePosition, timestamp time.Time) *types.VehicleUpdate {
-	if vehicle == nil {
+	if vehicle == nil || vehicle.Position == nil {
 		return nil
 	}
 
 	update := &types.VehicleUpdate{
 		Timestamp: timestamp.UnixMilli(),
+		Latitude:  vehicle.Position.GetLatitude(),
+		Longitude: vehicle.Position.GetLongitude(),
+		Bearing:   vehicle.Position.GetBearing(),
+		Speed:     vehicle.Position.GetSpeed(),
 		StopID:    getString(vehicle.StopId),
 	}
 
 	if vehicle.Trip != nil {
 		update.TripID = getString(vehicle.Trip.TripId)
 		update.RouteID = getString(vehicle.Trip.RouteId)
+		update.DirectionID = int32(vehicle.Trip.GetDirectionId())
 	}
 
 	if vehicle.CurrentStatus != nil {
@@ -62,13 +68,9 @@ func (g *Client) processVehicleUpdate(vehicle *gtfs.VehiclePosition, timestamp t
 		update.StopSequence = int32(seq)
 	}
 
-	if vehicle.Vehicle.Id != nil {
-		update.VehicleID = getString(vehicle.GetVehicle().Id)
+	if vehicle.Vehicle != nil && vehicle.Vehicle.Id != nil {
+		update.VehicleID = getString(vehicle.Vehicle.Id)
 	}
-
-	update.Latitude = vehicle.Position.GetLatitude()
-	update.Longitude = vehicle.Position.GetLongitude()
-	update.Bearing = vehicle.Position.GetBearing()
 
 	return update
 }
