@@ -21,8 +21,13 @@ func (g *Client) processTripUpdate(update *gtfs.TripUpdate, timestamp time.Time)
 
 	for _, stopTimeUpdate := range update.StopTimeUpdate {
 		var delay int32
+		var arrivalTime time.Time
 		if stopTimeUpdate.Arrival != nil {
 			delay = getInt32(stopTimeUpdate.Arrival.Delay)
+
+			if stopTimeUpdate.Arrival.Time != nil {
+				arrivalTime = time.Unix(*stopTimeUpdate.Arrival.Time, 0)
+			}
 		}
 
 		updates = append(updates, types.VehicleUpdate{
@@ -32,6 +37,7 @@ func (g *Client) processTripUpdate(update *gtfs.TripUpdate, timestamp time.Time)
 			Delay:       delay,
 			StopID:      getString(stopTimeUpdate.StopId),
 			DirectionID: direction,
+			ArrivalTime: arrivalTime.UnixMilli(),
 		})
 	}
 

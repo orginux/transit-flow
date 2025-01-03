@@ -17,11 +17,12 @@ type VehicleUpdate struct {
 	Latitude  float32 `parquet:"name=latitude, type=FLOAT"`
 	Longitude float32 `parquet:"name=longitude, type=FLOAT"`
 	Bearing   float32 `parquet:"name=bearing, type=FLOAT"`
-	Speed     float32 `parquet:"name=speed, type=FLOAT"` // From Position.speed in proto
+	Speed     float32 `parquet:"name=speed, type=FLOAT"`
 
 	// Stop data
 	StopID       string `parquet:"name=stop_id,type=BYTE_ARRAY,convertedtype=UTF8"`
 	StopSequence int32  `parquet:"name=stop_sequence,type=INT32,convertedtype=UINT_32"`
 	Status       string `parquet:"name=status,type=BYTE_ARRAY,convertedtype=UTF8"`
 	Delay        int32  `parquet:"name=delay,type=INT32"`
+	ArrivalTime  int64  `parquet:"name=arrival_time,type=INT64,convertedtype=TIMESTAMP_MILLIS"`
 }
