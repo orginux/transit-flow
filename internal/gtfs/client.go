@@ -46,7 +46,7 @@ func (g *Client) FetchUpdates(ctx context.Context) ([]types.VehicleUpdate, Metri
 	}
 
 	processingStart := time.Now()
-	updates := g.processFeed(feed)
+	updates := g.ProcessFeed(feed)
 	metrics.ProcessingTime = time.Since(processingStart)
 	metrics.TotalTime = time.Since(totalStart)
 	metrics.UpdatesCount = len(updates)
